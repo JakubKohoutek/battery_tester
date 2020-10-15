@@ -6,7 +6,7 @@ U8G2_SH1106_128X64_NONAME_2_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
 const int     CURRENT [] = {0,55,108,160,214,267,320,374,427,480,532};
 const int     PWM_STEP = 3;
 const int     PWM_MAX = (sizeof(CURRENT)/sizeof(CURRENT[0]) - 1) * PWM_STEP;
-float         VCC_CALIBRATION = 4.64; // Real voltage of Arduino 5V pin
+float         VCC_CALIBRATION = 4.8; // Real voltage of Arduino 5V pin
 const float   CUTOFF_BATTERY_VOLTAGE = 2.6;
 const byte    PWM_PIN = 10;
 const int     BAT_PIN = A0;
@@ -21,6 +21,7 @@ Button        downButton (3, 25, true, true);
 void setup () {
   pinMode(PWM_PIN, OUTPUT);
   analogWrite(PWM_PIN, pwmValue);
+  float BAT_Voltage = measureBatteryVoltage();
 
   upButton.begin();
   downButton.begin();
@@ -33,49 +34,33 @@ void setup () {
   } while (display.nextPage());
 
   delay(3000);
-
-  display.firstPage();
-  do {
-    display.drawStr( 0, 30, "Set current:");
-    display.drawStr(60, 30, "UP / DOWN");
-    display.drawStr( 0, 45, "To start:");
-    display.drawStr(45, 45, "long press UP");
-    display.drawStr( 0, 60, "To stop:");
-    display.drawStr(45, 60, "long press DOWN");
-  } while (display.nextPage());
 }
 
 void loop() {
   upButton.read();
   downButton.read();
 
+  float BAT_Voltage = analogRead(BAT_PIN) * VCC_CALIBRATION / 1024.0;
+
   if (upButton.wasReleased() && pwmValue < PWM_MAX && calc == false) {
     pwmValue = pwmValue + PWM_STEP;
-
-    display.firstPage();
-    do {
-      display.drawStr( 0, 30, "Current:");
-      display.drawStr(45, 30, (String(CURRENT[pwmValue/PWM_STEP]) + " mA").c_str());
-      display.drawStr( 0, 45, "To start:");
-      display.drawStr(45, 45, "long press UP");
-      display.drawStr( 0, 60, "To stop:");
-      display.drawStr(45, 60, "long press DOWN");
-    } while (display.nextPage());
   }
 
   if (downButton.wasReleased() && pwmValue > 0 && calc == false) {
     pwmValue = pwmValue - PWM_STEP;
+  }
 
-    display.firstPage();
-    do {
-      display.drawStr( 0, 30, "Current:");
-      display.drawStr(45, 30, (String(CURRENT[pwmValue/PWM_STEP]) + " mA").c_str());
-      display.drawStr( 0, 45, "To start:");
-      display.drawStr(45, 45, "long press UP");
-      display.drawStr( 0, 60, "To stop:");
-      display.drawStr(45, 60, "long press DOWN");
-    } while (display.nextPage());
-  } 
+  display.firstPage();
+  do {
+    display.drawStr( 0, 15, "Battery:");
+    display.drawStr(45, 15, BAT_Voltage > 0.2f ? (String(BAT_Voltage) + " V").c_str() : "Disconnected");
+    display.drawStr( 0, 30, "Current:");
+    display.drawStr(45, 30, (String(CURRENT[pwmValue/PWM_STEP]) + " mA").c_str());
+    display.drawStr( 0, 45, "To start:");
+    display.drawStr(45, 45, "long press UP");
+    display.drawStr( 0, 60, "To stop:");
+    display.drawStr(45, 60, "long press DOWN");
+  } while (display.nextPage());
 
   if (upButton.pressedFor(1000) && calc == false) {
     timerInterrupt();
@@ -138,8 +123,10 @@ void timerInterrupt () {
       } while (display.nextPage());
       pwmValue = 0;
       analogWrite(PWM_PIN, pwmValue);
-
       Done = true;
+      do {
+        // the flow ends here
+      } while (true);
     }
   }
 }
